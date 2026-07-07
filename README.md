@@ -38,12 +38,38 @@ uv run build.py            # downloads pinned sources, writes dist/
 uv run verify.py dist      # 2:1 metrics + SC coverage + ligature checks
 ```
 
-VS Code:
+## VS Code
 
 ```jsonc
-"editor.fontFamily": "Fira Code SC",
-"editor.fontLigatures": true
+// settings.json
+"editor.fontFamily": "'Fira Code SC'",
+"editor.fontLigatures": true,                       // ->  =>  !=  render fused
+"terminal.integrated.fontFamily": "Fira Code SC"   // optional
 ```
+
+Use the family name alone. Stacking it behind a *different* Latin font
+(e.g. `"JetBrains Mono, 'Fira Code SC'"`) breaks alignment: that font wins
+every Latin glyph, and the CJK glyphs — sized 2× *Fira Code's* 0.615 em
+cell — no longer measure an integer number of the other font's cells.
+
+### Newly installed font not taking effect
+
+Electron snapshots the system font list **when the app starts**. After
+installing the TTFs, `Developer: Reload Window` is *not* enough — fully
+quit VS Code (`Cmd+Q` / close all instances) and relaunch. Until then the
+family name silently falls back to the default stack (Menlo on macOS).
+
+### How to tell whether it's really active
+
+- Open a file mixing CJK and box-drawing text: every CJK char must span
+  exactly two cells, so padded boxes render a flush right border.
+- Definitive check: `Help → Toggle Developer Tools` → Elements → pick a
+  CJK glyph (`Cmd+Shift+C`) → Computed → **Rendered Fonts** (bottom).
+  It must say `Fira Code SC`, not `PingFang SC` / `Menlo`.
+- Menlo fingerprint: with `fontLigatures: true`, Menlo fuses `fi`/`fl`
+  into single-cell typographic ligatures (watch words like `finally`,
+  `verified` come up one column short). Fira Code SC never fuses `fi` —
+  it only ships Fira Code's symbol ligatures (`calt`).
 
 ## Styles
 
