@@ -32,7 +32,7 @@ from fontTools.pens.transformPen import TransformPen
 from fontTools.pens.roundingPen import RoundingPen
 from fontTools.pens.recordingPen import DecomposingRecordingPen
 
-FONT_VERSION = "0.1.0"
+FONT_VERSION = "0.2.0"
 FAMILY = "Fira Code SC"
 PS_FAMILY = "FiraCodeSC"
 
@@ -41,6 +41,14 @@ PLEX_URL = (
     "https://github.com/IBM/plex/releases/download/"
     "%40ibm/plex-sans-sc%401.1.0/ibm-plex-sans-sc.zip"
 )
+
+# Ink is drawn smaller than the advance box: scaling outlines by the full
+# metric factor (2 x fira_adv / plex_upm = 2.4) makes hanzi ~1.11 em tall,
+# visually dwarfing Fira's 0.71 em caps. At 5/6 of that (the ratio Firple
+# uses) the CJK em box lands at ~1.03 em - the glyph's natural optical
+# size - and the remaining width becomes equal side bearings. Advances are
+# never touched; the 2:1 metric is exact regardless of this knob.
+INK_RATIO = 5 / 6
 
 # (style name, fira ttf, plex ttf)
 STYLES = [
@@ -109,7 +117,8 @@ def set_name(name_table, string: str, name_id: int) -> None:
     name_table.setName(string, name_id, 1, 0, 0)      # Mac
 
 
-def merge(fira_path: Path, plex_path: Path, out_path: Path, style: str) -> dict:
+def merge(fira_path: Path, plex_path: Path, out_path: Path, style: str,
+          ink_ratio: float = INK_RATIO) -> dict:
     fira = TTFont(str(fira_path))
     plex = TTFont(str(plex_path))
 
@@ -119,6 +128,7 @@ def merge(fira_path: Path, plex_path: Path, out_path: Path, style: str) -> dict:
     plex_han_adv = plex["hmtx"][plex_cmap[0x4E00]][0]
     target_adv = 2 * fira_adv
     scale = target_adv / plex_han_adv
+    ink_scale = scale * ink_ratio
 
     todo = sorted(
         cp for cp in plex_cmap if is_wide(cp) and cp not in fira_cmap
@@ -142,14 +152,18 @@ def merge(fira_path: Path, plex_path: Path, out_path: Path, style: str) -> dict:
         new_name = f"cjk{cp:05X}"
         if new_name in existing:
             new_name += ".sc"
+        adv, lsb = plex_hmtx[src]
+        new_adv = round(adv * scale)
+        # Center the shrunken ink inside the unchanged advance box.
+        dx = (new_adv - adv * ink_scale) / 2
         rec = DecomposingRecordingPen(plex_glyphs)
         plex_glyphs[src].draw(rec)
         pen = TTGlyphPen(None)
-        rec.replay(TransformPen(RoundingPen(pen), (scale, 0, 0, scale, 0, 0)))
+        rec.replay(TransformPen(RoundingPen(pen),
+                                (ink_scale, 0, 0, ink_scale, dx, 0)))
         glyph = pen.glyph()
         glyf[new_name] = glyph
-        adv, lsb = plex_hmtx[src]
-        hmtx[new_name] = (round(adv * scale), round(lsb * scale))
+        hmtx[new_name] = (new_adv, round(lsb * ink_scale + dx))
         # note: glyf.__setitem__ already appended new_name to the shared
         # glyph order list; do not append again.
         existing.add(new_name)
@@ -215,6 +229,7 @@ def merge(fira_path: Path, plex_path: Path, out_path: Path, style: str) -> dict:
         "latin_adv": fira_adv,
         "cjk_adv": target_adv,
         "scale": round(scale, 4),
+        "ink_scale": round(ink_scale, 4),
     }
 
 
@@ -223,6 +238,9 @@ def main() -> None:
     ap.add_argument("--out", default="dist")
     ap.add_argument("--work", default=".work")
     ap.add_argument("--styles", default=",".join(s for s, _, _ in STYLES))
+    ap.add_argument("--cjk-ink-scale", type=float, default=INK_RATIO,
+                    help="ink size as a fraction of the metric scale "
+                         "(advance is always exactly 2x Latin)")
     args = ap.parse_args()
 
     wanted = set(args.styles.split(","))
@@ -234,7 +252,8 @@ def main() -> None:
         if style not in wanted:
             continue
         out = out_dir / f"{PS_FAMILY}-{style}.ttf"
-        info = merge(fira_dir / fira_ttf, plex_dir / plex_ttf, out, style)
+        info = merge(fira_dir / fira_ttf, plex_dir / plex_ttf, out, style,
+                     ink_ratio=args.cjk_ink_scale)
         print(f"built {out}  (+{info['added']} CJK glyphs, "
               f"latin {info['latin_adv']} / cjk {info['cjk_adv']})")
         results.append(out)

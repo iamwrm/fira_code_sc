@@ -18,6 +18,7 @@ import sys
 from pathlib import Path
 
 from fontTools.ttLib import TTFont
+from fontTools.pens.boundsPen import BoundsPen
 
 # Includes the four chars missing from IBM Plex Sans JP (the Firple gap).
 SC_PROBES = "时显查译上关午小年引日月用相看示翻中文简体测试"
@@ -37,6 +38,18 @@ def check(path: Path) -> list[str]:
         adv = hmtx[cmap[ord(ch)]][0]
         if adv != 2 * latin:
             errors.append(f"{ch}: advance {adv} != 2*{latin}")
+
+    # Optical size: hanzi ink should be moderately larger than Latin caps
+    # (Sarasa ~1.19x, Firple ~1.28x), never the full-metric ~1.54x blowup.
+    upm = f["head"].unitsPerEm
+    gs = f.getGlyphSet()
+    def ink_h(ch):
+        bp = BoundsPen(gs)
+        gs[cmap[ord(ch)]].draw(bp)
+        return (bp.bounds[3] - bp.bounds[1]) / upm
+    ratio = ink_h("\u56fd") / ink_h("H")
+    if not 1.1 <= ratio <= 1.4:
+        errors.append(f"\u56fd/H ink ratio {ratio:.3f} outside [1.1, 1.4]")
 
     feats = {
         fr.FeatureTag

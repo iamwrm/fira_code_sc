@@ -91,8 +91,12 @@ FontForge):
 
 1. downloads pinned releases — Fira Code 6.2, IBM Plex Sans SC 1.1.0;
 2. copies CJK-range glyphs (`U+2E80…U+9FFF`, compat, fullwidth forms,
-   extensions B+) that Fira Code doesn't cover, decomposing composites and
-   scaling outlines by `2 × fira_advance / plex_advance`;
+   extensions B+) that Fira Code doesn't cover, decomposing composites;
+   advances are scaled by `2 × fira_advance / plex_advance` (exact 2:1),
+   while ink is drawn at 5/6 of that (≈ 1.03 em — the hanzi's natural
+   optical size, same choice as Firple) and centered in the advance box —
+   full-metric ink would tower ≈1.54× over Fira's caps (tunable via
+   `--cjk-ink-scale`);
 3. adds a format-12 cmap subtable for non-BMP ideographs;
 4. keeps Fira Code's line metrics (line height unchanged for pure code) and
    only widens Win clip metrics for the taller CJK glyphs;
