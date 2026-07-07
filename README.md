@@ -23,6 +23,12 @@ PingFang SC) renders CJK at ≈1.67× a Fira cell, so nothing lines up.
 Fira Code advances 0.615 em; here Plex SC han glyphs are scaled to 1.231 em
 — exactly 2:1, the same figure Firple uses.
 
+**See it:** [demo/FiraCodeSC-demo.pdf](demo/FiraCodeSC-demo.pdf) — the same
+46-column box rendered with naive fallback (ragged) vs Fira Code SC (flush),
+plus ligature and SC-coverage samples. Regenerate with
+[typst](https://typst.app): the command is at the top of
+[demo/demo.typ](demo/demo.typ).
+
 ## Install
 
 Grab TTFs from [Releases](../../releases), or build locally:
